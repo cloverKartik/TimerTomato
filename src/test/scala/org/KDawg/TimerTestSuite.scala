@@ -21,6 +21,9 @@ class TimerTestSuite(_system: ActorSystem) extends TestKit(_system)
 		val timer = system.actorOf(Timer.props())
 		expectNoMsg(2 seconds)
 		timer ! Timer.Start()
+		ignoreMsg{
+		  case Timer.Remaining(x) => true
+		}
 		expectMsg( 2 seconds, Timer.Done )
 	}	
 	test( "Started Timer should expire with notification" )

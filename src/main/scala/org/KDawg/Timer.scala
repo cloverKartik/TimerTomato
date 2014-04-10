@@ -27,7 +27,6 @@ class Timer( timerVal: FiniteDuration, tickRate: FiniteDuration = 1 second) exte
   import context.dispatcher
 
    private [this] var duration: Long = 0;
-   private [this] var prevTime: Long = 0;
    def initial: Receive = { 
      case Start( time ) => 
        if( time.isDefined ) start( time.get ) else start( timerVal )
@@ -36,16 +35,14 @@ class Timer( timerVal: FiniteDuration, tickRate: FiniteDuration = 1 second) exte
    def receive = initial
    
    private [this] def start( time: FiniteDuration ) {
-     	prevTime = System.currentTimeMillis
+     	val prevTime = System.currentTimeMillis
      	val canc = context.system.scheduler.schedule(0 seconds, tickRate, self, Count )
-     	context.become( countingDown ( canc, sender ) )
+     	context.become( countingDown ( canc, sender, prevTime ) )
    }
-   def countingDown( timerCancellable: Cancellable, receiver: ActorRef ): Receive = {
+   def countingDown( timerCancellable: Cancellable, receiver: ActorRef, prevTime: Long ): Receive = {
      case Count =>
-       val tmpTime = System.currentTimeMillis
-       duration += tmpTime - prevTime
-       prevTime = tmpTime
-       
+       val tmpTime = System.currentTimeMillis()
+       duration += (tmpTime - prevTime)
        if( duration >= timerVal.toMillis ) {
          timerCancellable.cancel
          receiver ! Done
@@ -53,6 +50,7 @@ class Timer( timerVal: FiniteDuration, tickRate: FiniteDuration = 1 second) exte
        }
        else{
          receiver ! Remaining( timerVal - Duration(duration, MILLISECONDS) )
+         context.become( countingDown( timerCancellable, receiver, tmpTime) )
        }
      case Abort => 
        timerCancellable.cancel
