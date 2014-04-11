@@ -20,6 +20,9 @@ object TimerController
   case object StopBreak
   case object WorkUnitDone
   case object BreakUnitDone
+  sealed abstract class Aborted
+  case object AbortedBreak extends Aborted
+  case object AbortedWork extends Aborted
   case class TimeRemaining( duration: FiniteDuration )
   
   def props( workUnit: FiniteDuration = 25 minutes, breakUnit: FiniteDuration = 5 minutes ) = 
@@ -51,7 +54,10 @@ class TimerController( work: FiniteDuration, brkTime: FiniteDuration ) extends A
       context.become( initial )
     case Remaining( remaining: FiniteDuration ) =>
       context.system.eventStream.publish( TimeRemaining( remaining ) )
-    
+    case StopWork =>
+      context.system.eventStream.publish(AbortedBreak)
+      timer ! Abort
+      context.become( initial )
   }
   def working( timer: ActorRef): Receive = {
     case Done => 
@@ -60,19 +66,9 @@ class TimerController( work: FiniteDuration, brkTime: FiniteDuration ) extends A
       context.become(initial)
     case Remaining( remaining: FiniteDuration ) =>
       context.system.eventStream.publish( TimeRemaining( remaining ) )
-      
+    case StopWork =>
+      context.system.eventStream.publish( AbortedWork )
+      timer ! Abort
+      context.become( initial )
   }
-  /*
-  def working( timer: ActorRef, current: FiniteDuration): Receive = {
-    case Done => 
-      context.system.eventStream.publish(WorkUnitDone)
-      timer !  Abort
-      context.become(initial)
-    case Remaining( remaining: FiniteDuration ) =>
-      println( s"Remaining Time: $remaining" )
-      if( (current - remaining) >= (1 second) ){
-    	  context.system.eventStream.publish( TimeRemaining( remaining ) )
-    	  context.become(working( timer, remaining ))
-      }
-  }*/
 }

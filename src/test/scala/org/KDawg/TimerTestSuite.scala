@@ -43,6 +43,22 @@ class TimerTestSuite(_system: ActorSystem) extends TestKit(_system)
 	    case _ => false
 	  }
 	}
+	test( "Timer Stops with time still left and resumes from there" )
+	{
+	  val timer = system.actorOf( Timer.props( 5 seconds ) )
+	  timer ! Timer.Start()
+	  ignoreMsg{ 
+	    case Timer.Remaining(x) => true
+	  }
+	  expectNoMsg(2 seconds)
+	  timer ! Timer.Stop
+	  expectMsgPF(3 seconds){ 
+	    case Timer.Stopped( rem ) => assert( rem < (3 seconds), "Should stop with less than five seconds on clock" )
+	  }
+	  timer ! Timer.Start()
+	  expectMsg( 4 seconds, Timer.Done )
+	}
+	
 	test( "Query Expired Timer" ) 
 	{
 	  val timer = system.actorOf( Timer.props() )
